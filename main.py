@@ -16,7 +16,7 @@ def main():
     # Define all necessary paths
     model_path = os.path.join('models', 'ffn.model')
     category_mapping_path = os.path.join('data', 'category_mappings.pickle')
-    train_data_path = os.path.join('data', 'train_data.csv')
+    train_data_path = os.path.join('data', 'train_data.hdf5')
     train_transaction_path = os.path.join('data', 'train_transaction.csv')
     train_identity_path = os.path.join('data', 'train_identity.csv')
 
@@ -117,13 +117,13 @@ def main():
         del ran, cont_mu, cont_sigma
         train_data[continuous_cols] = train_data_cont
         del train_data_cont
-        # Save the train_data into a csv file THEN read it in chunks
-        train_data.to_csv(train_data_path, index=False)
+        # Save the train_data into a hdf5 file
+        train_data.to_hdf(train_data_path, 'data', mode='w', format='table')
         del train_data
     else:
         with open(category_mapping_path, 'rb') as f:
             category_mappings = pickle.load(f)
-        all_cols = pd.read_csv(train_data_path, nrows=0).columns.to_list()
+        all_cols = pd.read_hdf(train_data_path, stop=0).columns.to_list()
         continuous_cols = [col for col in all_cols if col not in categorical_cols + [output_col]]
         del all_cols
 
@@ -144,7 +144,7 @@ def main():
 
     # Create a batch generator
     dataset = LargeTabularDataset(data_path=train_data_path, cont_cols=continuous_cols,
-                                  cat_cols=categorical_cols, output_col=output_col)
+                                  cat_cols=categorical_cols, output_col=output_col, is_hdf=True)
     data_loader = DataLoader(dataset, batch_size=32, num_workers=6)
 
     def data_epoch_generator(data_loader, epoch=1000):
