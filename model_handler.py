@@ -40,7 +40,7 @@ class FixedInputFixedOutputModelHandler:
 
     def batch_to_device(self, batch):
         if torch.is_tensor(batch):
-            return batch.to(self.device)
+            return batch.to(self.device, non_blocking=True)
         return [self.batch_to_device(batch_component) for batch_component in batch]
 
     def train(self, in_tgt_generator, update_per_step=1, save_per_update=10, save_path='',

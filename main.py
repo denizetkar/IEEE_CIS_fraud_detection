@@ -141,38 +141,38 @@ def main():
         {'emb_dims': [(lambda cat_dim: (cat_dim, (cat_dim - 1) // 3 + 1))(len(category_mappings[col]))
                       for col in categorical_cols],
          'no_of_cont': len(continuous_cols),
-         'lin_layer_sizes': (lambda inp_dim: [4096, 2048]) \
+         'lin_layer_sizes': (lambda inp_dim: [4096, 4096, 2048]) \
              (sum(len(category_mappings[col]) for col in categorical_cols) + len(continuous_cols)),
-         'output_size': 2, 'emb_dropout': 0.1,
-         'lin_layer_dropouts': [0.1, 0.2]}, (), optim_args={'lr': 3e-4},
+         'output_size': 2, 'emb_dropout': 0.0,
+         'lin_layer_dropouts': [0.1, 0.2, 0.2]}, (), optim_args={'lr': 3e-4},
         device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
 
     # Load the model first
     model_handler.load(model_path)
 
     # Chunk size is the number of rows to read from disk at a time !!!!
-    batch_size = 500
-    epoch = 100
+    batch_size = 2000
+    epoch = 10
     train_dataset = LargeTabularDataset(data_path=train_data_path, cont_cols=continuous_cols,
                                         cat_cols=categorical_cols, output_col=output_col,
-                                        chunksize=100 * batch_size, is_hdf=True)
+                                        chunksize=10 * batch_size, is_hdf=True)
     # 'batch_size' below is the batch size of chunks !!!!!!!!!!!
-    train_chunk_loader = DataLoader(train_dataset, batch_size=1, num_workers=6)
+    train_chunk_loader = DataLoader(train_dataset, batch_size=1, num_workers=2, pin_memory=torch.cuda.is_available())
 
     # Create a dataset and chunk loader for eval data as well
     eval_dataset = LargeTabularDataset(data_path=eval_data_path, cont_cols=continuous_cols,
                                        cat_cols=categorical_cols, output_col=output_col,
                                        chunksize=10 * batch_size, is_hdf=True)
     # 'batch_size' below is the batch size of chunks !!!!!!!!!!!
-    eval_chunk_loader = DataLoader(eval_dataset, batch_size=1, num_workers=6)
+    eval_chunk_loader = DataLoader(eval_dataset, batch_size=1, num_workers=2, pin_memory=torch.cuda.is_available())
 
-    # Create a batch generator
     for i in range(epoch):
-        model_handler.train(in_tgt_generator=helper.data_epoch_generator(train_chunk_loader, batch_size, epoch=1),
-                            save_path=model_path)
+        # Create a batch generator
+        model_handler.train(in_tgt_generator=helper.data_epoch_generator(train_chunk_loader, batch_size, epoch=1))
         eval_loss = model_handler.eval(
             in_tgt_generator=helper.data_epoch_generator(eval_chunk_loader, batch_size, epoch=1))
         print('Eval loss @ epoch: ' + str(i) + ' is ' + str(eval_loss))
+    model_handler.save(model_path)
     pass
 
 
