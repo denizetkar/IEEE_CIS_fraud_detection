@@ -6,36 +6,22 @@ import torch
 from torch.utils.data import IterableDataset
 
 
-class OpenHDFS:
-    """Context Manager class to open / create a HDFS / h5 file"""
-
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-
-    def __enter__(self):
-        self.open_file = pd.HDFStore(*self.args, **self.kwargs)
-        return self.open_file
-
-    def __exit__(self, *args):
-        self.open_file.close()
-
-
 class LargeTabularDataset(IterableDataset):
-    def __init__(self, data_path, cont_cols, cat_cols, output_col, is_hdf=False):
+    def __init__(self, data_path, cont_cols, cat_cols, output_col, chunksize, is_hdf=False):
         self.data_path = data_path
-        if not is_hdf:
+        if is_hdf:
+            with pd.HDFStore(data_path) as store:
+                self.nb_samples = store.get_storer('data').nrows
+        else:
             # Assume it is csv
             # self.nb_samples = pd.read_csv(data_path, usecols=[0]).shape[0]
             with open(data_path) as f:
                 self.nb_samples = max(sum(1 for line in f if line) - 1, 0)
-        else:
-            with OpenHDFS(data_path) as store:
-                self.nb_samples = store.get_storer('data').nrows
 
         self.cont_cols = cont_cols
         self.cat_cols = cat_cols
         self.output_col = output_col
+        self.chunksize = chunksize
         self.is_hdf = is_hdf
 
     def __iter__(self):
@@ -57,30 +43,29 @@ class LargeTabularDatesetIterator:
 
     def __init__(self, tabular_dataset, start_row, end_row):
         self._tabular_dataset = tabular_dataset
-        self._iter_size = end_row - start_row
-        self._index = 0
+
         if self._tabular_dataset.is_hdf:
             self._pd_chunk_iter = iter(
                 pd.read_hdf(
                     self._tabular_dataset.data_path,
-                    start=start_row, chunksize=1))
+                    start=start_row, stop=end_row,
+                    chunksize=self._tabular_dataset.chunksize))
         else:
+            # Assume it is csv
             self._pd_chunk_iter = pd.read_csv(
                 self._tabular_dataset.data_path,
                 skiprows=range(1, start_row + 1),
-                chunksize=1)
+                nrows=end_row - start_row,
+                chunksize=self._tabular_dataset.chunksize)
 
     def __next__(self):
-        if self._index < self._iter_size:
-            x = next(self._pd_chunk_iter)
-            cont_x = x[self._tabular_dataset.cont_cols].astype(np.float32).squeeze(axis=0).values
-            cat_x = x[self._tabular_dataset.cat_cols].astype(np.int64).squeeze(axis=0).values
-            # 'y' is a scalar
-            y = x[self._tabular_dataset.output_col].astype(np.int64).squeeze(axis=0)
-            self._index += 1
-            return (cont_x, cat_x), y
+        x = next(self._pd_chunk_iter)
+        cont_x = x[self._tabular_dataset.cont_cols].astype(np.float32).squeeze(axis=0).values
+        cat_x = x[self._tabular_dataset.cat_cols].astype(np.int64).squeeze(axis=0).values
+        # 'y' is a vector of scalar
+        y = x[self._tabular_dataset.output_col].astype(np.int64).values
 
-        raise StopIteration
+        return (cont_x, cat_x), y
 
 
 class BiDirectionalDict:
@@ -182,3 +167,36 @@ def safe_del(var_list, local_context):
     for v in var_list:
         if v in local_context:
             del local_context[v]
+
+
+def data_epoch_generator(chunk_loader, batch_size, epoch=100):
+    for _ in range(epoch):
+        for (cont_chunk, cat_chunk), target_chunk in chunk_loader:
+            # Fix the shapes from (1 x N x F) -> (N x F) and (1 x N) -> (N)
+            (cont_chunk, cat_chunk), target_chunk = \
+                (cont_chunk.view(-1, cont_chunk.shape[-1]),
+                 cat_chunk.view(-1, cat_chunk.shape[-1])), \
+                target_chunk.view(target_chunk.shape[-1])
+            # Read batches from chunks and yield them
+            chunk_size = target_chunk.shape[0]
+            start_index = 0
+            while start_index < chunk_size:
+                end_index = min(start_index + batch_size, chunk_size)
+                yield (cont_chunk[start_index:end_index, :],
+                       cat_chunk[start_index:end_index, :]), \
+                      target_chunk[start_index:end_index]
+                start_index = end_index
+
+
+def train_eval_split_hdf5(train_eval_path, train_path, eval_path, train_ratio=0.9, processed_size=50000):
+    with pd.HDFStore(train_eval_path) as store:
+        nb_samples = store.get_storer('data').nrows
+    nb_train_samples = round(int(nb_samples) * train_ratio)
+    chunk_iter = iter(pd.read_hdf(train_eval_path, chunksize=processed_size))
+    with pd.HDFStore(train_path, mode='w') as train_f, pd.HDFStore(eval_path, mode='w') as eval_f:
+        for chunk in chunk_iter:
+            chunk = chunk.sample(frac=1)
+            last_train_index = round(train_ratio * len(chunk))
+            train_f.append('data', chunk.iloc[:last_train_index, :], format='table', expectedrows=nb_train_samples)
+            eval_f.append('data', chunk.iloc[last_train_index:, :], format='table',
+                          expectedrows=nb_samples - nb_train_samples)

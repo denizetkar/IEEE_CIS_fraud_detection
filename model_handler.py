@@ -44,8 +44,8 @@ class FixedInputFixedOutputModelHandler:
         return [self.batch_to_device(batch_component) for batch_component in batch]
 
     def train(self, in_tgt_generator, update_per_step=1, save_per_update=10, save_path='',
-              verbose_per_step=50, verbose=True):
-        step_count, optim_count = 0, 0
+              verbose_per_update=50, verbose=True):
+        step_count, optim_count, update_loss = 0, 0, 0.0
         self.model.train()
         for input_batch, target_batch in in_tgt_generator:
             input_batch, target_batch = self.batch_to_device(input_batch), self.batch_to_device(target_batch)
@@ -53,16 +53,28 @@ class FixedInputFixedOutputModelHandler:
             loss = self.loss_func(output_batch, target_batch) / update_per_step
             loss.backward()
             step_count += 1
-            if step_count % verbose_per_step == 0 and verbose:
-                print('At step: ' + str(step_count) + ' Loss: ' + str(loss))
+            update_loss += loss.item()
             if step_count % update_per_step == 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 optim_count += 1
+                if optim_count % verbose_per_update == 0 and verbose:
+                    print('At step: ' + str(step_count) + ' Loss: ' + str(update_loss))
+                update_loss = 0.0
                 if optim_count % save_per_update == 0 and save_path:
                     self.save(save_path)
 
-    def eval(self, in_generator):
+    def eval(self, in_tgt_generator):
+        self.model.eval()
+        mean_loss = 0.0
+        for n, (input_batch, target_batch) in enumerate(in_tgt_generator, start=1):
+            input_batch, target_batch = self.batch_to_device(input_batch), self.batch_to_device(target_batch)
+            output_batch = self.model(input_batch)
+            loss = self.loss_func(output_batch, target_batch)
+            mean_loss = mean_loss + (loss.item() - mean_loss) / n
+        return mean_loss
+
+    def predict(self, in_generator):
         self.model.eval()
         for input_batch in in_generator:
-            yield self.model(input_batch)
+            yield self.model(input_batch).detach().cpu().numpy()
