@@ -44,16 +44,26 @@ class FixedInputFixedOutputModelHandler:
         return [self.batch_to_device(batch_component) for batch_component in batch]
 
     def train(self, in_tgt_generator, update_per_step=1, save_per_update=10, save_path='',
-              verbose_per_update=50, verbose=True):
-        step_count, optim_count, update_loss = 0, 0, 0.0
+              verbose_per_update=50, verbose=True, summary_func_list=None):
+        if summary_func_list is None:
+            summary_func_list = []
+        optim_count, update_loss = 0, 0.0
         self.model.train()
-        for input_batch, target_batch in in_tgt_generator:
+        for step_count, (input_batch, target_batch) in enumerate(in_tgt_generator, start=1):
             input_batch, target_batch = self.batch_to_device(input_batch), self.batch_to_device(target_batch)
             output_batch = self.model(input_batch)
             loss = self.loss_func(output_batch, target_batch) / update_per_step
             loss.backward()
-            step_count += 1
             update_loss += loss.item()
+            if verbose:
+                # Let user defined summary functions run
+                for summary_func in summary_func_list:
+                    summary = summary_func(model=self.model, input_batch=input_batch, output_batch=output_batch,
+                                           loss=loss.item(), step_count=step_count, update_per_step=update_per_step,
+                                           verbose_per_update=verbose_per_update)
+                    if summary is not None:
+                        print('At step: ' + str(step_count) + ' ' + summary[0] + ': ' + str(summary[1]))
+            # If it is time to update, then update the model
             if step_count % update_per_step == 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()

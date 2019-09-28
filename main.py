@@ -144,7 +144,7 @@ def main():
          'lin_layer_sizes': (lambda inp_dim: [4096, 4096, 2048]) \
              (sum(len(category_mappings[col]) for col in categorical_cols) + len(continuous_cols)),
          'output_size': 2, 'emb_dropout': 0.0,
-         'lin_layer_dropouts': [0.1, 0.2, 0.2]}, (), optim_args={'lr': 3e-4},
+         'lin_layer_dropouts': [0.1, 0.2, 0.2]}, (), optim_args={'lr': 3e-4, 'weight_decay': 0.05},
         device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
 
     # Load the model first
@@ -168,7 +168,8 @@ def main():
 
     for i in range(epoch):
         # Create a batch generator
-        model_handler.train(in_tgt_generator=helper.data_epoch_generator(train_chunk_loader, batch_size, epoch=1))
+        model_handler.train(in_tgt_generator=helper.data_epoch_generator(train_chunk_loader, batch_size, epoch=1),
+                            summary_func_list=[helper.l2_norm_model])
         eval_loss = model_handler.eval(
             in_tgt_generator=helper.data_epoch_generator(eval_chunk_loader, batch_size, epoch=1))
         print('Eval loss @ epoch: ' + str(i) + ' is ' + str(eval_loss))

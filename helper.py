@@ -3,6 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 from torch.utils.data import IterableDataset
 
 
@@ -200,3 +201,13 @@ def train_eval_split_hdf5(train_eval_path, train_path, eval_path, train_ratio=0.
             train_f.append('data', chunk.iloc[:last_train_index, :], format='table', expectedrows=nb_train_samples)
             eval_f.append('data', chunk.iloc[last_train_index:, :], format='table',
                           expectedrows=nb_samples - nb_train_samples)
+
+
+def l2_norm_model(model, step_count, verbose_per_update, *args, **kwargs):
+    if step_count % verbose_per_update == 0:
+        norm = 0.0
+        l2 = nn.MSELoss()
+        for param in model.parameters():
+            norm += l2(param, torch.zeros_like(param)).item()
+        return 'L2 of model', norm
+    return None
