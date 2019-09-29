@@ -203,8 +203,9 @@ def train_eval_split_hdf5(train_eval_path, train_path, eval_path, train_ratio=0.
                           expectedrows=nb_samples - nb_train_samples)
 
 
-def l2_norm_model(model, step_count, verbose_per_update, *args, **kwargs):
-    if step_count % verbose_per_update == 0:
+def l2_norm_model(model, step_count, step_per_update, update_per_verbose, *args, **kwargs):
+    step_per_verbose = step_per_update * update_per_verbose
+    if step_count % step_per_verbose == 0:
         norm = 0.0
         l2 = nn.MSELoss()
         for param in model.parameters():

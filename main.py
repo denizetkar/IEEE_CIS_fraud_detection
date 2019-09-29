@@ -144,8 +144,9 @@ def main():
          'lin_layer_sizes': (lambda inp_dim: [4096, 4096, 2048]) \
              (sum(len(category_mappings[col]) for col in categorical_cols) + len(continuous_cols)),
          'output_size': 2, 'emb_dropout': 0.0,
-         'lin_layer_dropouts': [0.1, 0.2, 0.2]}, (), optim_args={'lr': 3e-4, 'weight_decay': 0.05},
-        device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+         'lin_layer_dropouts': [0.1, 0.2, 0.2]}, (), optim_args={'lr': 3e-4},
+        device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+        l1_regularization_weight=1.0)
 
     # Load the model first
     model_handler.load(model_path)
