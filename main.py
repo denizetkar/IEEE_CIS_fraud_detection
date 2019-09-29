@@ -152,25 +152,25 @@ def main():
     model_handler.load(model_path)
 
     # Chunk size is the number of rows to read from disk at a time !!!!
-    batch_size = 2000
+    batch_size = 5000
     epoch = 10
     train_dataset = LargeTabularDataset(data_path=train_data_path, cont_cols=continuous_cols,
                                         cat_cols=categorical_cols, output_col=output_col,
-                                        chunksize=10 * batch_size, is_hdf=True)
+                                        chunksize=5 * batch_size, is_hdf=True)
     # 'batch_size' below is the batch size of chunks !!!!!!!!!!!
     train_chunk_loader = DataLoader(train_dataset, batch_size=1, num_workers=2, pin_memory=torch.cuda.is_available())
 
     # Create a dataset and chunk loader for eval data as well
     eval_dataset = LargeTabularDataset(data_path=eval_data_path, cont_cols=continuous_cols,
                                        cat_cols=categorical_cols, output_col=output_col,
-                                       chunksize=10 * batch_size, is_hdf=True)
+                                       chunksize=5 * batch_size, is_hdf=True)
     # 'batch_size' below is the batch size of chunks !!!!!!!!!!!
     eval_chunk_loader = DataLoader(eval_dataset, batch_size=1, num_workers=2, pin_memory=torch.cuda.is_available())
 
     for i in range(epoch):
         # Create a batch generator
         model_handler.train(in_tgt_generator=helper.data_epoch_generator(train_chunk_loader, batch_size, epoch=1),
-                            summary_func_list=[helper.l2_norm_model])
+                            step_per_update=1, update_per_verbose=50, summary_func_list=[helper.l2_norm_model])
         eval_loss = model_handler.eval(
             in_tgt_generator=helper.data_epoch_generator(eval_chunk_loader, batch_size, epoch=1))
         print('Eval loss @ epoch: ' + str(i) + ' is ' + str(eval_loss))

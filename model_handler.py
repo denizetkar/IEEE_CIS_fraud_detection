@@ -1,3 +1,5 @@
+import gc
+
 import torch
 import torch.nn as nn
 
@@ -84,6 +86,14 @@ class FixedInputFixedOutputModelHandler:
                 if optim_count % update_per_save == 0 and save_path:
                     self.save(save_path)
 
+                # Open up space for new variables in the next iteration
+                del l1_loss
+                gc.collect()
+
+            # Open up space for new variables in the next iteration
+            del loss, output_batch, input_batch, target_batch
+            gc.collect()
+
         # Check for unaccounted loss gradients
         unaccounted_steps = step_count % step_per_update
         if unaccounted_steps > 0:
@@ -109,6 +119,9 @@ class FixedInputFixedOutputModelHandler:
             output_batch = self.model(input_batch)
             loss = self.loss_func(output_batch, target_batch)
             mean_loss = mean_loss + (loss.item() - mean_loss) / n
+            # Open up space for new variables in the next iteration
+            del loss, output_batch, input_batch, target_batch
+            gc.collect()
         return mean_loss
 
     def predict(self, in_generator):
