@@ -127,4 +127,15 @@ class FixedInputFixedOutputModelHandler:
     def predict(self, in_generator):
         self.model.eval()
         for input_batch in in_generator:
+            input_batch = self.batch_to_device(input_batch)
             yield self.model(input_batch).detach().cpu().numpy()
+
+    def accuracy(self, in_tgt_generator):
+        self.model.eval()
+        num_of_correct_pred, num_of_samples = 0, 0
+        for input_batch, target_batch in in_tgt_generator:
+            input_batch, target_batch = self.batch_to_device(input_batch), self.batch_to_device(target_batch)
+            output_batch = self.model(input_batch)
+            num_of_correct_pred += torch.sum(torch.argmax(output_batch.detach(), dim=-1) == target_batch).item()
+            num_of_samples += target_batch.shape[0]
+        return num_of_correct_pred / num_of_samples

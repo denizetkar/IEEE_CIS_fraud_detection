@@ -8,7 +8,7 @@ from torch.utils.data import IterableDataset
 
 
 class LargeTabularDataset(IterableDataset):
-    def __init__(self, data_path, cont_cols, cat_cols, output_col, chunksize, is_hdf=False):
+    def __init__(self, data_path, cont_cols, cat_cols, output_col, chunksize, shuffle=False, is_hdf=False):
         self.data_path = data_path
         if is_hdf:
             with pd.HDFStore(data_path) as store:
@@ -23,6 +23,7 @@ class LargeTabularDataset(IterableDataset):
         self.cat_cols = cat_cols
         self.output_col = output_col
         self.chunksize = chunksize
+        self.shuffle = shuffle
         self.is_hdf = is_hdf
 
     def __iter__(self):
@@ -61,6 +62,8 @@ class LargeTabularDatesetIterator:
 
     def __next__(self):
         x = next(self._pd_chunk_iter)
+        if self._tabular_dataset.shuffle:
+            x = x.sample(frac=1)
         cont_x = x[self._tabular_dataset.cont_cols].astype(np.float32).squeeze(axis=0).values
         cat_x = x[self._tabular_dataset.cat_cols].astype(np.int64).squeeze(axis=0).values
         # 'y' is a vector of scalar

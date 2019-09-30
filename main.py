@@ -15,7 +15,7 @@ from ffn import FeedForwardNN
 
 def main():
     # Define all necessary paths
-    model_path = os.path.join('models', 'ffn.model')
+    model_path = os.path.join('models', 'ffn_without_logsoftmax.model')
     category_mapping_path = os.path.join('data', 'category_mappings.pickle')
     train_eval_data_path = os.path.join('data', 'train_eval_data.hdf5')
     train_data_path = os.path.join('data', 'train_data.hdf5')
@@ -144,7 +144,7 @@ def main():
          'lin_layer_sizes': (lambda inp_dim: [4096, 4096, 2048]) \
              (sum(len(category_mappings[col]) for col in categorical_cols) + len(continuous_cols)),
          'output_size': 2, 'emb_dropout': 0.0,
-         'lin_layer_dropouts': [0.1, 0.2, 0.2]}, (), optim_args={'lr': 3e-4},
+         'lin_layer_dropouts': [0.1, 0.2, 0.2]}, (), optim_args={'lr': 3e-5},
         device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
         l1_regularization_weight=1.0)
 
@@ -152,25 +152,25 @@ def main():
     model_handler.load(model_path)
 
     # Chunk size is the number of rows to read from disk at a time !!!!
-    batch_size = 5000
+    batch_size = 6000
     epoch = 10
     train_dataset = LargeTabularDataset(data_path=train_data_path, cont_cols=continuous_cols,
                                         cat_cols=categorical_cols, output_col=output_col,
-                                        chunksize=5 * batch_size, is_hdf=True)
+                                        chunksize=24 * batch_size, shuffle=True, is_hdf=True)
     # 'batch_size' below is the batch size of chunks !!!!!!!!!!!
     train_chunk_loader = DataLoader(train_dataset, batch_size=1, num_workers=2, pin_memory=torch.cuda.is_available())
 
     # Create a dataset and chunk loader for eval data as well
     eval_dataset = LargeTabularDataset(data_path=eval_data_path, cont_cols=continuous_cols,
                                        cat_cols=categorical_cols, output_col=output_col,
-                                       chunksize=5 * batch_size, is_hdf=True)
+                                       chunksize=2 * batch_size, is_hdf=True)
     # 'batch_size' below is the batch size of chunks !!!!!!!!!!!
     eval_chunk_loader = DataLoader(eval_dataset, batch_size=1, num_workers=2, pin_memory=torch.cuda.is_available())
 
     for i in range(epoch):
         # Create a batch generator
         model_handler.train(in_tgt_generator=helper.data_epoch_generator(train_chunk_loader, batch_size, epoch=1),
-                            step_per_update=1, update_per_verbose=50, summary_func_list=[helper.l2_norm_model])
+                            step_per_update=20, update_per_verbose=2, summary_func_list=[helper.l2_norm_model])
         eval_loss = model_handler.eval(
             in_tgt_generator=helper.data_epoch_generator(eval_chunk_loader, batch_size, epoch=1))
         print('Eval loss @ epoch: ' + str(i) + ' is ' + str(eval_loss))
