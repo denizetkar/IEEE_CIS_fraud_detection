@@ -8,14 +8,14 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 import helper
-from helper import BiDirectionalDict, LargeTabularDataset
+from helper import BiDirectionalDict, LargeTabularDataset, DataEpochGenerator
 from model_handler import FixedInputFixedOutputModelHandler
 from ffn import FeedForwardNN
 
 
 def main():
     # Define all necessary paths
-    model_path = os.path.join('models', 'ffn_without_logsoftmax.model')
+    model_path = os.path.join('models', 'ffn.model')
     category_mapping_path = os.path.join('data', 'category_mappings.pickle')
     train_eval_data_path = os.path.join('data', 'train_eval_data.hdf5')
     train_data_path = os.path.join('data', 'train_data.hdf5')
@@ -167,13 +167,15 @@ def main():
     # 'batch_size' below is the batch size of chunks !!!!!!!!!!!
     eval_chunk_loader = DataLoader(eval_dataset, batch_size=1, num_workers=2, pin_memory=torch.cuda.is_available())
 
-    for i in range(epoch):
-        # Create a batch generator
-        model_handler.train(in_tgt_generator=helper.data_epoch_generator(train_chunk_loader, batch_size, epoch=1),
-                            step_per_update=20, update_per_verbose=2, summary_func_list=[helper.l2_norm_model])
-        eval_loss = model_handler.eval(
-            in_tgt_generator=helper.data_epoch_generator(eval_chunk_loader, batch_size, epoch=1))
-        print('Eval loss @ epoch: ' + str(i) + ' is ' + str(eval_loss))
+    # Create a batch generator
+    step_per_update = 20
+    update_per_verbose = 2
+    batch_per_epoch = (train_dataset.nb_samples - 1) // batch_size + 1
+    update_per_epoch = (batch_per_epoch - 1) // step_per_update + 1
+    model_handler.train(in_tgt_generator=DataEpochGenerator(train_chunk_loader, batch_size, epoch=epoch),
+                        eval_in_tgt_generator=DataEpochGenerator(eval_chunk_loader, batch_size, epoch=1),
+                        update_per_eval=update_per_epoch, step_per_update=step_per_update,
+                        update_per_verbose=update_per_verbose, summary_func_list=[helper.l2_norm_model])
     model_handler.save(model_path)
     pass
 

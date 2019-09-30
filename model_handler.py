@@ -48,7 +48,8 @@ class FixedInputFixedOutputModelHandler:
             return batch.to(self.device, non_blocking=True)
         return [self.batch_to_device(batch_component) for batch_component in batch]
 
-    def train(self, in_tgt_generator, step_per_update=1, update_per_save=10, save_path='',
+    def train(self, in_tgt_generator, eval_in_tgt_generator=None, update_per_eval=50,
+              step_per_update=1, update_per_save=10, save_path='',
               update_per_verbose=50, verbose=True, summary_func_list=None):
         if summary_func_list is None:
             summary_func_list = []
@@ -83,6 +84,10 @@ class FixedInputFixedOutputModelHandler:
                 if optim_count % update_per_verbose == 0 and verbose:
                     print('At step: ' + str(step_count) + ' Loss: ' + str(update_loss))
                 update_loss = 0.0
+                if optim_count % update_per_eval == 0 and eval_in_tgt_generator is not None and verbose:
+                    eval_loss = self.eval(in_tgt_generator=eval_in_tgt_generator)
+                    self.model.train()
+                    print('Eval loss @ step: ' + str(step_count) + ' is ' + str(eval_loss))
                 if optim_count % update_per_save == 0 and save_path:
                     self.save(save_path)
 

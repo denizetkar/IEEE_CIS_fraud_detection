@@ -173,6 +173,16 @@ def safe_del(var_list, local_context):
             del local_context[v]
 
 
+class DataEpochGenerator:
+    def __init__(self, chunk_loader, batch_size, epoch=100):
+        self.chunk_loader = chunk_loader
+        self.batch_size = batch_size
+        self.epoch = epoch
+
+    def __iter__(self):
+        return data_epoch_generator(self.chunk_loader, self.batch_size, self.epoch)
+
+
 def data_epoch_generator(chunk_loader, batch_size, epoch=100):
     for _ in range(epoch):
         for (cont_chunk, cat_chunk), target_chunk in chunk_loader:
