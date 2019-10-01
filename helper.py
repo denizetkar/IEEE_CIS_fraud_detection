@@ -74,9 +74,10 @@ class LargeTabularDatesetIterator:
 
 class BiDirectionalDict:
 
-    def __init__(self, d=None):
+    def __init__(self, d=None, none_value=None):
         if d is None:
             d = {}
+        self.none_value = none_value
         self._forward_dict = {}
         self._backward_dict = {}
         self.update(d)
@@ -102,17 +103,33 @@ class BiDirectionalDict:
 
     def forward(self, first_key):
         if first_key not in self._forward_dict:
-            return None
+            return self.none_value
         return self._forward_dict[first_key]
 
     def backward(self, second_key):
         if second_key not in self._backward_dict:
-            return None
+            return self.none_value
         return self._backward_dict[second_key]
 
-    def update(self, dictionary):
-        for first_key, second_key in dictionary.items():
-            self.add(first_key, second_key)
+    def update(self, dictionary, forward=True):
+        if forward:
+            for first_key, second_key in dictionary.items():
+                self.add(first_key, second_key)
+        else:
+            for second_key, first_key in dictionary.items():
+                self.add(first_key, second_key)
+
+    def first_keys(self):
+        return self._forward_dict.keys()
+
+    def second_keys(self):
+        return self._backward_dict.keys()
+
+    def items(self, forward=True):
+        if forward:
+            return self._forward_dict.items()
+        else:
+            return self._backward_dict.items()
 
 
 class NaN(float):
@@ -125,6 +142,9 @@ class NaN(float):
 
     def __eq__(self, other):
         return np.isnan(other)
+
+    def __bool__(self):
+        return False
 
 
 nan = NaN()

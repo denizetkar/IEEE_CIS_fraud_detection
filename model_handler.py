@@ -129,11 +129,11 @@ class FixedInputFixedOutputModelHandler:
             gc.collect()
         return mean_loss
 
-    def predict(self, in_generator):
+    def predict(self, in_id_generator):
         self.model.eval()
-        for input_batch in in_generator:
+        for input_batch, id_batch in in_id_generator:
             input_batch = self.batch_to_device(input_batch)
-            yield self.model(input_batch).detach().cpu().numpy()
+            yield self.model(input_batch).detach(), id_batch.detach()
 
     def accuracy(self, in_tgt_generator):
         self.model.eval()

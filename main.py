@@ -39,10 +39,8 @@ def main():
 
     if not os.path.exists(train_eval_data_path) or not os.path.exists(category_mapping_path):
         # Read training data
-        train_transaction = helper.reduce_memory_usage(
-            pd.read_csv(train_transaction_path))
-        train_identity = helper.reduce_memory_usage(
-            pd.read_csv(train_identity_path))
+        train_transaction = helper.reduce_memory_usage(pd.read_csv(train_transaction_path))
+        train_identity = helper.reduce_memory_usage(pd.read_csv(train_identity_path))
         # Merge 'transaction' and 'identity' on 'TransactionID'
         train_eval_data = pd.merge(train_transaction, train_identity, on='TransactionID', how='left')
         del train_transaction, train_identity
@@ -79,18 +77,17 @@ def main():
         train_eval_data.loc[train_eval_data['device_name'].str.contains('HTC', na=False), 'device_name'] = 'HTC'
         train_eval_data.loc[train_eval_data['device_name'].str.contains('ASUS', na=False), 'device_name'] = 'Asus'
         train_eval_data.loc[train_eval_data['device_name'].isin(
-            train_eval_data['device_name'].value_counts()[train_eval_data['device_name'].value_counts() < 200].index),
-                            'device_name'] = "Others"
+            train_eval_data['device_name'].value_counts()[
+                train_eval_data['device_name'].value_counts() < 200].index.drop(['Linux'])), 'device_name'] = "Others"
 
         train_eval_data['id_31'] = train_eval_data['id_31'].str.replace(r' *[\d\.]+', '')
         # TODO: https://www.kaggle.com/artgor/eda-and-models#Feature-engineering
         # Cast all categorical columns to 'category' data type
-        train_eval_data[categorical_cols] = \
-            train_eval_data[categorical_cols].astype('category')
+        train_eval_data[categorical_cols] = train_eval_data[categorical_cols].astype('category')
         # Get numerical mapping between categories and codes for each categorical column
         category_mappings = {}
         for col in categorical_cols:
-            category_mapping = BiDirectionalDict({helper.nan: 0})
+            category_mapping = BiDirectionalDict({helper.nan: 0}, none_value=0)
             category_mapping.update(
                 {category: code + 1
                  for code, category in enumerate(train_eval_data[col].cat.categories)})
@@ -177,7 +174,6 @@ def main():
                         update_per_eval=update_per_epoch, step_per_update=step_per_update,
                         update_per_verbose=update_per_verbose, summary_func_list=[helper.l2_norm_model])
     model_handler.save(model_path)
-    pass
 
 
 if __name__ == '__main__':
