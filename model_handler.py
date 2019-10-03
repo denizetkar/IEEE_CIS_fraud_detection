@@ -107,8 +107,8 @@ class FixedInputFixedOutputModelHandler:
             for param in self.model.parameters():
                 param.grad *= step_per_update / unaccounted_steps
             # Calculate L1 norm of the model parameters
-            l1_loss = self.l1_regularization_weight * sum(
-                self.l1_loss_func(param, torch.zeros_like(param)) for param in self.model.parameters())
+            l1_loss = self.l1_regularization_weight * torch.stack(
+                [self.l1_loss_func(param, torch.zeros_like(param)) for param in self.model.parameters()]).mean()
             l1_loss.backward()
             # Take an optimization step
             self.optimizer.step()
