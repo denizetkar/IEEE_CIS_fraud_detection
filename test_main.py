@@ -16,8 +16,8 @@ from ffn import FeedForwardNN
 
 def main():
     # Define all necessary paths
-    model_path = os.path.join('models', 'test_ffn.model')
-    category_mapping_path = os.path.join('data', 'test_category_mappings.pickle')
+    model_path = os.path.join('models', 'ffn.model')
+    category_mapping_path = os.path.join('data', 'category_mappings.pickle')
     test_data_path = os.path.join('data', 'test_data.hdf5')
     submission_path = os.path.join('data', 'submission.csv')
 
