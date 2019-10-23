@@ -74,8 +74,9 @@ class FixedInputFixedOutputModelHandler:
             # If it is time to update, then update the model
             if step_count % step_per_update == 0:
                 # Calculate L1 norm of the model parameters
-                l1_loss = self.l1_regularization_weight * sum(
-                    self.l1_loss_func(param, torch.zeros_like(param)) for param in self.model.parameters())
+                l1_loss = self.l1_regularization_weight * torch.stack(
+                    [self.l1_loss_func(param, torch.zeros_like(param))
+                     for name, param in self.model.named_parameters() if 'bias' not in name]).mean()
                 l1_loss.backward()
                 # Take an optimization step
                 self.optimizer.step()
@@ -108,7 +109,8 @@ class FixedInputFixedOutputModelHandler:
                 param.grad *= step_per_update / unaccounted_steps
             # Calculate L1 norm of the model parameters
             l1_loss = self.l1_regularization_weight * torch.stack(
-                [self.l1_loss_func(param, torch.zeros_like(param)) for param in self.model.parameters()]).mean()
+                [self.l1_loss_func(param, torch.zeros_like(param))
+                 for name, param in self.model.named_parameters() if 'bias' not in name]).mean()
             l1_loss.backward()
             # Take an optimization step
             self.optimizer.step()
